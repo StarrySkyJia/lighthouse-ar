@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { createLiveScene, createPixelPipeline, qualityPreset } from './live-scene.js';
 
+window.__LIVE_OK = true;
+
 const $ = (id) => document.getElementById(id);
 const hint = $('hint');
 const banner = $('banner');
@@ -34,7 +36,7 @@ let screenOrientAngle = 0;
 const orientEuler = new THREE.Euler();
 const orientQ0 = new THREE.Quaternion();
 const orientQ1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5));
-const orient Zee = new THREE.Vector3(0, 0, 1);
+const orientZee = new THREE.Vector3(0, 0, 1);
 const deviceAlphaBetaGamma = { alpha: 0, beta: 90, gamma: 0 };
 
 function setHint(t) { hint.textContent = t; }
