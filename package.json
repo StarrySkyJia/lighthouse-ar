@@ -1,0 +1,24 @@
+{
+  "name": "ar",
+  "version": "1.0.0",
+  "description": "独立入口，**不会改动**主站 `lighthouse/index.html` / `src.html`。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StarrySkyJia/lighthouse-ar.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/StarrySkyJia/lighthouse-ar/issues"
+  },
+  "homepage": "https://github.com/StarrySkyJia/lighthouse-ar#readme",
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
