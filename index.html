@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="description" content="灯塔小岛桌面 AR：扫码后在 iPhone / Android 上放到真实桌面观看" />
+<meta name="description" content="灯塔小岛桌面 AR：iPhone Quick Look + Android Scene Viewer" />
 <title>灯塔小岛 · 扫码桌面 AR</title>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
@@ -14,7 +14,6 @@
     --bg1: #123047;
     --foam: #f3f7fb;
     --muted: rgba(243, 247, 251, 0.72);
-    --sea: #3a8fb5;
     --sand: #d2b07a;
     --line: rgba(255,255,255,0.12);
   }
@@ -33,10 +32,7 @@
     margin: 0 auto;
     padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
   }
-  header {
-    text-align: center;
-    margin-bottom: 14px;
-  }
+  header { text-align: center; margin-bottom: 14px; }
   header .eyebrow {
     display: inline-block;
     font-size: 12px;
@@ -57,6 +53,18 @@
     font-size: 14px;
     line-height: 1.5;
   }
+  #banner {
+    display: none;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 180, 70, 0.16);
+    border: 1px solid rgba(255, 210, 120, 0.45);
+    color: #ffe6b0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #banner strong { color: #fff; }
   .stage {
     position: relative;
     border-radius: 18px;
@@ -72,12 +80,21 @@
     --poster-color: transparent;
     background: transparent;
   }
-  .ar-btn {
+  /* Hide model-viewer's own AR slots; we drive AR ourselves */
+  model-viewer .ar-btn,
+  model-viewer [slot="ar-button"],
+  model-viewer [slot="ar-failure"] { display: none !important; }
+
+  .ar-cta {
     position: absolute;
     left: 50%;
     bottom: 14px;
     transform: translateX(-50%);
-    appearance: none;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 180px;
     border: 0;
     border-radius: 999px;
     padding: 12px 22px;
@@ -86,11 +103,18 @@
     color: #08131c;
     background: linear-gradient(135deg, #f0d9a0, #d7ae62);
     box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    text-decoration: none;
     cursor: pointer;
     white-space: nowrap;
-    z-index: 2;
   }
-  .ar-btn[data-unsupported] {
+  .ar-cta img {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ar-cta.ghost {
     background: rgba(255,255,255,0.16);
     color: var(--foam);
   }
@@ -101,10 +125,7 @@
     background: rgba(8, 18, 28, 0.55);
     border: 1px solid var(--line);
   }
-  .panel h2 {
-    font-size: 15px;
-    margin-bottom: 8px;
-  }
+  .panel h2 { font-size: 15px; margin-bottom: 8px; }
   .panel ol, .panel ul {
     padding-left: 1.2em;
     color: var(--muted);
@@ -117,9 +138,7 @@
     gap: 12px;
     margin-top: 12px;
   }
-  @media (max-width: 560px) {
-    .grid { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
   .share {
     display: flex;
     flex-direction: column;
@@ -135,12 +154,11 @@
     border-radius: 12px;
     background: #fff;
   }
-  #qr img, #qr canvas { width: 100% !important; height: 100% !important; }
+  #qr canvas { width: 100% !important; height: 100% !important; }
   .share .url {
     font-size: 11px;
     color: var(--muted);
     word-break: break-all;
-    max-width: 100%;
   }
   .chip-row {
     display: flex;
@@ -171,16 +189,19 @@
     <header>
       <div class="eyebrow">Tabletop WebAR</div>
       <h1>灯塔小岛</h1>
-      <p>扫码打开本页 → 点「放到桌上」→ 用摄像头把小岛放进真实桌面。<br/>兼容 iPhone（Quick Look）与 Android（Scene Viewer / WebXR）。</p>
+      <p>扫码打开 → 点「放到桌上」→ 用摄像头放到真实桌面。<br/>iPhone 走系统 Quick Look，Android 走 Scene Viewer。</p>
     </header>
+
+    <div id="banner"></div>
 
     <div class="stage">
       <model-viewer
         id="mv"
         src="island.glb"
+        ios-src="island.usdz"
         alt="灯塔小岛"
         ar
-        ar-modes="webxr scene-viewer quick-look"
+        ar-modes="quick-look scene-viewer webxr"
         ar-scale="fixed"
         camera-controls
         touch-action="pan-y"
@@ -191,11 +212,25 @@
         auto-rotate-delay="0"
         rotation-per-second="12deg"
         loading="eager"
-        reveal="auto"
+      ></model-viewer>
+
+      <!-- iOS: Apple official Quick Look entry (requires <img> child) -->
+      <a
+        id="iosAr"
+        class="ar-cta"
+        rel="ar"
+        href="island.usdz"
+        download="island.usdz"
       >
-        <button class="ar-btn" slot="ar-button" type="button">放到桌上（AR）</button>
-        <button class="ar-btn" slot="ar-failure" type="button" data-unsupported>当前浏览器暂不支持 AR</button>
-      </model-viewer>
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAD0lEQVQYV2NkYGD4z0ABRwEACvMAxVn7I3QAAAAASUVORK5CYII=" width="16" height="16" alt="灯塔小岛" />
+        放到桌上（AR）
+      </a>
+
+      <!-- Android / other: activate model-viewer AR -->
+      <button id="androidAr" class="ar-cta" type="button">放到桌上（AR）</button>
+
+      <!-- Desktop fallback -->
+      <button id="deskHint" class="ar-cta ghost" type="button">请用手机扫码体验 AR</button>
     </div>
 
     <div class="chip-row" id="chips"></div>
@@ -204,10 +239,9 @@
       <section class="panel">
         <h2>怎么用</h2>
         <ol>
-          <li>用手机摄像头 / 微信扫一扫打开本页（需 https）。</li>
-          <li>点黄色按钮「放到桌上（AR）」，允许摄像头权限。</li>
-          <li>对准平坦桌面，移动手机直到出现放置框，点一下即可。</li>
-          <li>iPhone 会进入系统 Quick Look；Android 多为 Scene Viewer / WebXR。</li>
+          <li><strong>iPhone</strong>：请用 <strong>Safari</strong> 打开本页（微信里需点右上角 ··· → 在 Safari 中打开）。</li>
+          <li>点黄色「放到桌上（AR）」，进入系统 AR 后对准桌面放置。</li>
+          <li><strong>Android</strong>：推荐 Chrome，点同一按钮即可。</li>
         </ol>
       </section>
       <section class="panel share">
@@ -218,11 +252,11 @@
     </div>
 
     <section class="panel" style="margin-top:12px">
-      <h2>设备说明</h2>
+      <h2>若 iPhone 仍进不了 AR</h2>
       <ul>
-        <li><strong>iPhone / iPad</strong>：Safari 或微信内置浏览器通常可走 Quick Look AR（系统级桌面放置）。</li>
-        <li><strong>Android</strong>：推荐 Chrome；部分机型走 Google Scene Viewer。</li>
-        <li>电脑浏览器可旋转预览模型，一般不能开摄像头 AR。</li>
+        <li>不要用微信内置浏览器直接点 AR，先转到 Safari。</li>
+        <li>也可直接打开模型文件：<a id="usdzLink" href="island.usdz">island.usdz</a>（Safari 会提示用 AR Quick Look 查看）。</li>
+        <li>系统需 iOS 12+，并允许网站使用摄像头 / AR。</li>
       </ul>
     </section>
 
@@ -236,12 +270,21 @@
 (function () {
   const url = location.href.split('#')[0];
   document.getElementById('pageUrl').textContent = url;
+  document.getElementById('usdzLink').href = new URL('island.usdz', location.href).href;
 
-  const chips = document.getElementById('chips');
   const ua = navigator.userAgent || '';
   const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const isAndroid = /Android/i.test(ua);
-  const isMobile = isIOS || isAndroid || /Mobile/i.test(ua);
+  const isWeChat = /MicroMessenger/i.test(ua);
+  const isQQ = /\bQQ\//i.test(ua);
+  const isInApp = isWeChat || isQQ || /BytedanceWebview|Aweme|DingTalk/i.test(ua);
+
+  const chips = document.getElementById('chips');
+  const banner = document.getElementById('banner');
+  const iosAr = document.getElementById('iosAr');
+  const androidAr = document.getElementById('androidAr');
+  const deskHint = document.getElementById('deskHint');
+  const mv = document.getElementById('mv');
 
   function addChip(text, cls) {
     const el = document.createElement('span');
@@ -250,15 +293,52 @@
     chips.appendChild(el);
   }
 
-  if (isIOS) addChip('检测到 iOS · 将使用 Quick Look AR', 'ok');
-  else if (isAndroid) addChip('检测到 Android · Scene Viewer / WebXR', 'ok');
-  else addChip('桌面端 · 可预览，AR 请用手机扫码', 'warn');
+  // Absolute USDZ URL helps some iOS / in-app browsers
+  iosAr.href = new URL('island.usdz', location.href).href;
+
+  if (isIOS) {
+    iosAr.style.display = 'flex';
+    addChip('iOS · 系统 Quick Look AR', 'ok');
+    if (isInApp) {
+      banner.style.display = 'block';
+      banner.innerHTML = '<strong>检测到微信/内置浏览器。</strong> iPhone 的桌面 AR 需要 Safari：请点右上角 <strong>···</strong> → <strong>在 Safari 中打开</strong>，再点「放到桌上」。';
+      addChip('请改用 Safari', 'warn');
+    }
+  } else if (isAndroid) {
+    androidAr.style.display = 'flex';
+    addChip('Android · Scene Viewer / WebXR', 'ok');
+    if (isWeChat) {
+      banner.style.display = 'block';
+      banner.innerHTML = '微信内置浏览器对 AR 支持不稳定。若按钮无效，请点右上角 <strong>···</strong> → <strong>在浏览器中打开</strong>（Chrome）。';
+      addChip('建议用 Chrome 打开', 'warn');
+    }
+  } else {
+    deskHint.style.display = 'flex';
+    addChip('桌面端仅预览', 'warn');
+  }
 
   if (location.protocol === 'https:' || location.hostname === 'localhost') {
     addChip('HTTPS 已就绪', 'ok');
   } else {
-    addChip('非 HTTPS，摄像头 AR 可能无法启动', 'warn');
+    addChip('非 HTTPS，AR 可能失败', 'warn');
   }
+
+  androidAr.addEventListener('click', async () => {
+    try {
+      if (mv.canActivateAR) {
+        await mv.activateAR();
+      } else {
+        // Fallback: intent-style Scene Viewer
+        const modelUrl = encodeURIComponent(new URL('island.glb', location.href).href);
+        const intent = 'intent://arvr.google.com/scene-viewer/1.0?file=' + modelUrl +
+          '&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=' +
+          encodeURIComponent(location.href) + ';end;';
+        location.href = intent;
+      }
+    } catch (e) {
+      alert('无法启动 AR，请用 Chrome 打开本页后重试');
+    }
+  });
 
   if (window.QRCode && QRCode.toCanvas) {
     const box = document.getElementById('qr');
@@ -268,21 +348,7 @@
       width: 132,
       margin: 1,
       color: { dark: '#123047', light: '#ffffff' },
-    }, function (err) {
-      if (err) box.textContent = '二维码生成失败';
     });
-  }
-
-  // Soft hint if AR button never appears as supported
-  const mv = document.getElementById('mv');
-  mv.addEventListener('ar-status', (ev) => {
-    const s = ev.detail && ev.detail.status;
-    if (s === 'failed') addChip('AR 启动失败，请换 Safari / Chrome 重试', 'warn');
-    if (s === 'not-presenting' || s === 'session-started') { /* ok */ }
-  });
-
-  if (!isMobile) {
-    // Keep preview useful on desktop
   }
 })();
 </script>
