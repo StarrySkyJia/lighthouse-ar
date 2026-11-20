@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>灯塔小岛 · 快速静态 AR</title>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+<style>
+  :root { --foam:#f3f7fb; --muted:rgba(243,247,251,.72); --sand:#d2b07a; --line:rgba(255,255,255,.12); }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body {
+    min-height:100%; background:linear-gradient(180deg,#123047,#071018); color:var(--foam);
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  .wrap { width:min(720px,100%); margin:0 auto; padding:max(16px,env(safe-area-inset-top)) 16px 28px; }
+  header { text-align:center; margin-bottom:12px; }
+  h1 { font-size:clamp(24px,6vw,32px); }
+  p { margin-top:6px; color:var(--muted); font-size:13px; line-height:1.5; }
+  .stage {
+    position:relative; border-radius:18px; overflow:hidden; aspect-ratio:1/1.05;
+    background:rgba(0,0,0,.28); border:1px solid var(--line);
+  }
+  model-viewer { width:100%; height:100%; background:transparent; }
+  .ar-cta {
+    position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:5;
+    display:none; align-items:center; justify-content:center; min-width:180px;
+    border:0; border-radius:999px; padding:12px 22px; font-size:15px; font-weight:700;
+    color:#08131c; background:linear-gradient(135deg,#f0d9a0,#d7ae62); text-decoration:none;
+  }
+  .ar-cta img { position:absolute; width:1px; height:1px; opacity:0; }
+  #banner {
+    display:none; margin-bottom:10px; padding:10px 12px; border-radius:12px;
+    background:rgba(255,180,70,.16); border:1px solid rgba(255,210,120,.4);
+    color:#ffe6b0; font-size:12px; line-height:1.45;
+  }
+  .nav { margin-top:12px; text-align:center; font-size:13px; }
+  .nav a { color:#9fd0e8; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>快速静态 AR</h1>
+      <p>系统 Quick Look / Scene Viewer · 无实时动画<br/>要海浪/鸟/鱼/像素风请用<a href="./live.html" style="color:#9fd0e8">完整动态版</a></p>
+    </header>
+    <div id="banner"></div>
+    <div class="stage">
+      <model-viewer
+        id="mv" src="island.glb" ios-src="island.usdz" alt="灯塔小岛"
+        ar ar-modes="quick-look scene-viewer webxr" ar-scale="fixed"
+        camera-controls touch-action="pan-y" shadow-intensity="1"
+        auto-rotate rotation-per-second="12deg" loading="eager"
+      ></model-viewer>
+      <a id="iosAr" class="ar-cta" rel="ar" href="island.usdz" download="island.usdz">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAD0lEQVQYV2NkYGD4z0ABRwEACvMAxVn7I3QAAAAASUVORK5CYII=" width="16" height="16" alt="" />
+        放到桌上（AR）
+      </a>
+      <button id="androidAr" class="ar-cta" type="button">放到桌上（AR）</button>
+    </div>
+    <div class="nav"><a href="./">← 返回入口</a> · <a href="./live.html">完整动态 AR</a></div>
+  </div>
+<script>
+(function(){
+  const ua = navigator.userAgent||'';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  const isAndroid = /Android/i.test(ua);
+  const isWeChat = /MicroMessenger/i.test(ua);
+  const banner = document.getElementById('banner');
+  const iosAr = document.getElementById('iosAr');
+  const androidAr = document.getElementById('androidAr');
+  const mv = document.getElementById('mv');
+  iosAr.href = new URL('island.usdz', location.href).href;
+  if (isIOS) {
+    iosAr.style.display='flex';
+    if (isWeChat) { banner.style.display='block'; banner.innerHTML='请点右上角 <strong>···</strong> → <strong>在 Safari 中打开</strong>'; }
+  } else if (isAndroid) {
+    androidAr.style.display='flex';
+  } else {
+    androidAr.style.display='flex'; androidAr.textContent='请用手机扫码';
+  }
+  androidAr.addEventListener('click', async ()=>{
+    try {
+      if (mv.canActivateAR) await mv.activateAR();
+      else {
+        const modelUrl = encodeURIComponent(new URL('island.glb', location.href).href);
+        location.href = 'intent://arvr.google.com/scene-viewer/1.0?file='+modelUrl+'&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;';
+      }
+    } catch(e) { alert('无法启动 AR'); }
+  });
+})();
+</script>
+</body>
+</html>
