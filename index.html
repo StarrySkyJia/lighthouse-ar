@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>灯塔小岛 · 桌面 AR</title>
+<style>
+  :root {
+    --ink: #1a2430;
+    --foam: #f4f7fb;
+    --sea: #2a6f8f;
+    --sand: #c9a66b;
+    --lamp: #ffd27a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #0b1520;
+    color: var(--foam);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #overlay {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .brand {
+    pointer-events: none;
+  }
+  .brand h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-shadow: 0 1px 8px rgba(0,0,0,.55);
+  }
+  .brand p {
+    margin-top: 4px;
+    font-size: 12px;
+    opacity: .85;
+    text-shadow: 0 1px 6px rgba(0,0,0,.5);
+  }
+  .pill {
+    pointer-events: auto;
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    background: rgba(15, 28, 40, .72);
+    color: var(--foam);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 18px rgba(0,0,0,.28);
+    cursor: pointer;
+  }
+  .pill:disabled { opacity: .45; cursor: default; }
+  .pill.primary {
+    background: linear-gradient(135deg, #3a8fb5, #1f5f7a);
+  }
+  .pill.ghost {
+    background: rgba(255,255,255,.12);
+  }
+  .bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .hint {
+    max-width: 320px;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(10, 18, 28, .62);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    text-shadow: 0 1px 4px rgba(0,0,0,.4);
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28%;
+    transform: translateX(-50%) translateY(8px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(0,0,0,.72);
+    font-size: 13px;
+    transition: opacity .25s, transform .25s;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="overlay">
+  <div class="top">
+    <div class="brand">
+      <h1>灯塔小岛</h1>
+      <p id="modeLabel">桌面 AR 预览</p>
+    </div>
+    <button class="pill ghost" id="btnReset" type="button" style="display:none">重新放置</button>
+  </div>
+  <div class="bottom">
+    <div class="hint" id="hint">正在检测设备 AR 能力…</div>
+    <div class="actions">
+      <button class="pill primary" id="btnAR" type="button" disabled>进入 AR</button>
+      <button class="pill" id="btnPreview" type="button">三维预览</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const canvas = document.getElementById('c');
+const hintEl = document.getElementById('hint');
+const modeLabel = document.getElementById('modeLabel');
+const btnAR = document.getElementById('btnAR');
+const btnPreview = document.getElementById('btnPreview');
+const btnReset = document.getElementById('btnReset');
+const toastEl = document.getElementById('toast');
+
+const TABLE_SCALE = 0.22; // ~22cm wide island on table
+const PREVIEW_SCALE = 1.0;
+
+let renderer, scene, camera, clock;
+let islandRoot, reticle, controls;
+let xrHitTestSource = null;
+let xrViewerSpace = null;
+let xrRefSpace = null;
+let placed = false;
+let mode = 'boot'; // boot | preview | ar-scan | ar-placed
+let toastTimer = 0;
+
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+}
+
+function setHint(text) {
+  hintEl.textContent = text;
+}
+
+function setMode(next) {
+  mode = next;
+  if (next === 'preview') {
+    modeLabel.textContent = '三维预览（非 AR）';
+    btnReset.style.display = 'none';
+    btnAR.style.display = '';
+    btnPreview.style.display = 'none';
+  } else if (next === 'ar-scan') {
+    modeLabel.textContent = 'AR · 寻找桌面';
+    btnReset.style.display = 'none';
+    btnAR.style.display = 'none';
+    btnPreview.style.display = 'none';
+  } else if (next === 'ar-placed') {
+    modeLabel.textContent = 'AR · 已放置';
+    btnReset.style.display = '';
+    btnAR.style.display = 'none';
+    btnPreview.style.display = 'none';
+  }
+}
+
+/* ---------- Scene content (desktop-scale island) ---------- */
+function makeIsland() {
+  const root = new THREE.Group();
+  root.name = 'Island';
+
+  // water disc (shallow pool look)
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(0.72, 48),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a6f8f,
+      roughness: 0.35,
+      metalness: 0.15,
+      transparent: true,
+      opacity: 0.92,
+    })
+  );
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.002;
+  water.receiveShadow = true;
+  root.add(water);
+
+  // island mound
+  const landMat = new THREE.MeshStandardMaterial({ color: 0x6b9a5a, roughness: 0.85, metalness: 0.05 });
+  const sandMat = new THREE.MeshStandardMaterial({ color: 0xc9a66b, roughness: 0.9, metalness: 0 });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x7a756c, roughness: 0.95, metalness: 0.05 });
+
+  const mound = new THREE.Mesh(new THREE.SphereGeometry(0.38, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.52), landMat);
+  mound.scale.set(1.15, 0.55, 1.0);
+  mound.position.y = 0.01;
+  mound.castShadow = true;
+  mound.receiveShadow = true;
+  root.add(mound);
+
+  const beach = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.07, 10, 40), sandMat);
+  beach.rotation.x = Math.PI / 2;
+  beach.position.y = 0.02;
+  beach.scale.set(1.05, 0.95, 1);
+  beach.receiveShadow = true;
+  root.add(beach);
+
+  // lighthouse
+  const tower = new THREE.Group();
+  tower.position.set(0.08, 0.12, -0.05);
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.06, 16), rockMat);
+  base.position.y = 0.03;
+  base.castShadow = true;
+  tower.add(base);
+
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.055, 0.28, 16),
+    new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.7 })
+  );
+  body.position.y = 0.2;
+  body.castShadow = true;
+  tower.add(body);
+
+  // red stripe
+  const stripe = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.046, 0.05, 0.05, 16),
+    new THREE.MeshStandardMaterial({ color: 0xb33a3a, roughness: 0.65 })
+  );
+  stripe.position.y = 0.22;
+  tower.add(stripe);
+
+  const gallery = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.06, 0.02, 16),
+    new THREE.MeshStandardMaterial({ color: 0x33404c, roughness: 0.6 })
+  );
+  gallery.position.y = 0.35;
+  tower.add(gallery);
+
+  const lantern = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.035, 0.05, 12),
+    new THREE.MeshStandardMaterial({
+      color: 0xffe3a1,
+      emissive: 0xffc066,
+      emissiveIntensity: 0.85,
+      roughness: 0.4,
+      transparent: true,
+      opacity: 0.95,
+    })
+  );
+  lantern.position.y = 0.39;
+  tower.add(lantern);
+
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(0.05, 0.05, 12),
+    new THREE.MeshStandardMaterial({ color: 0x2c3540, roughness: 0.55 })
+  );
+  roof.position.y = 0.44;
+  tower.add(roof);
+
+  const lampLight = new THREE.PointLight(0xffd27a, 0.55, 1.6, 2);
+  lampLight.position.y = 0.39;
+  tower.add(lampLight);
+
+  root.add(tower);
+
+  // small cottage
+  const house = new THREE.Group();
+  house.position.set(-0.18, 0.08, 0.08);
+  const hut = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.08, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xd8c3a0, roughness: 0.8 })
+  );
+  hut.position.y = 0.04;
+  hut.castShadow = true;
+  house.add(hut);
+  const hutRoof = new THREE.Mesh(
+    new THREE.ConeGeometry(0.1, 0.07, 4),
+    new THREE.MeshStandardMaterial({ color: 0x8b4a3a, roughness: 0.85 })
+  );
+  hutRoof.position.y = 0.11;
+  hutRoof.rotation.y = Math.PI / 4;
+  house.add(hutRoof);
+  root.add(house);
+
+  // pier
+  const pier = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.015, 0.22),
+    new THREE.MeshStandardMaterial({ color: 0x8b6a45, roughness: 0.9 })
+  );
+  pier.position.set(0.28, 0.02, 0.18);
+  pier.rotation.y = -0.35;
+  pier.castShadow = true;
+  root.add(pier);
+
+  // trees (simple cones)
+  function tree(x, z, h = 0.12) {
+    const g = new THREE.Group();
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.01, 0.04, 6),
+      new THREE.MeshStandardMaterial({ color: 0x6b4a2e })
+    );
+    trunk.position.y = 0.02;
+    g.add(trunk);
+    const leaf = new THREE.Mesh(
+      new THREE.ConeGeometry(0.04, h, 7),
+      new THREE.MeshStandardMaterial({ color: 0x3f7a45, roughness: 0.8 })
+    );
+    leaf.position.y = 0.04 + h * 0.4;
+    leaf.castShadow = true;
+    g.add(leaf);
+    g.position.set(x, 0.06, z);
+    root.add(g);
+  }
+  tree(-0.05, 0.16, 0.11);
+  tree(-0.22, -0.06, 0.13);
+  tree(0.22, -0.12, 0.09);
+
+  // rocks
+  for (let i = 0; i < 5; i++) {
+    const r = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.025 + Math.random() * 0.02, 0),
+      rockMat
+    );
+    const a = (i / 5) * Math.PI * 2 + 0.4;
+    r.position.set(Math.cos(a) * 0.36, 0.03, Math.sin(a) * 0.3);
+    r.rotation.set(Math.random(), Math.random(), Math.random());
+    r.castShadow = true;
+    root.add(r);
+  }
+
+  root.scale.setScalar(TABLE_SCALE);
+  root.visible = false;
+  return root;
+}
+
+function makeReticle() {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.06, 0.075, 48),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  g.add(ring);
+  const cross = new THREE.Mesh(
+    new THREE.RingGeometry(0.008, 0.014, 24),
+    new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
+  );
+  cross.rotation.x = -Math.PI / 2;
+  g.add(cross);
+  g.visible = false;
+  return g;
+}
+
+function initThree() {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.xr.enabled = true;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 40);
+  camera.position.set(0.45, 0.35, 0.55);
+
+  clock = new THREE.Clock();
+
+  const hemi = new THREE.HemisphereLight(0xb8d4ef, 0x4a3a28, 0.85);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff0d8, 1.05);
+  sun.position.set(1.2, 2.2, 0.8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  sun.shadow.camera.near = 0.1;
+  sun.shadow.camera.far = 6;
+  sun.shadow.camera.left = -1;
+  sun.shadow.camera.right = 1;
+  sun.shadow.camera.top = 1;
+  sun.shadow.camera.bottom = -1;
+  scene.add(sun);
+
+  islandRoot = makeIsland();
+  scene.add(islandRoot);
+
+  reticle = makeReticle();
+  scene.add(reticle);
+
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.target.set(0, 0.05, 0);
+  controls.minDistance = 0.25;
+  controls.maxDistance = 2.2;
+  controls.maxPolarAngle = Math.PI * 0.48;
+  controls.enabled = false;
+
+  window.addEventListener('resize', onResize);
+  canvas.addEventListener('pointerdown', onPointerDown);
+
+  renderer.setAnimationLoop(animate);
+}
+
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+}
+
+function enterPreview() {
+  if (renderer.xr.isPresenting) return;
+  setMode('preview');
+  setHint('拖动旋转查看小岛。支持 AR 的手机可点「进入 AR」，对准桌面后点击放置。');
+  scene.background = new THREE.Color(0x0e1a26);
+  islandRoot.visible = true;
+  islandRoot.position.set(0, 0, 0);
+  islandRoot.quaternion.identity();
+  islandRoot.scale.setScalar(PREVIEW_SCALE * TABLE_SCALE);
+  reticle.visible = false;
+  controls.enabled = true;
+  camera.position.set(0.45, 0.35, 0.55);
+  controls.target.set(0, 0.05, 0);
+  controls.update();
+  placed = false;
+}
+
+async function checkARSupport() {
+  const xr = navigator.xr;
+  if (!xr) {
+    setHint('当前浏览器不支持 WebXR。可先用「三维预览」查看；Android Chrome 扫码效果最好。');
+    btnAR.disabled = true;
+    return false;
+  }
+  try {
+    const ok = await xr.isSessionSupported('immersive-ar');
+    if (ok) {
+      setHint('检测到 AR 能力。点「进入 AR」，把手机对准平坦桌面，出现光圈后点击放置小岛。');
+      btnAR.disabled = false;
+      return true;
+    }
+  } catch (_) { /* ignore */ }
+  setHint('此设备/浏览器暂不支持 immersive-ar（常见于 iOS Safari）。可用「三维预览」，或换 Android Chrome 扫码体验 AR。');
+  btnAR.disabled = true;
+  return false;
+}
+
+async function startAR() {
+  if (!navigator.xr) return;
+  try {
+    const sessionInit = {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay', 'light-estimation'],
+      domOverlay: { root: document.getElementById('overlay') },
+    };
+    let session;
+    try {
+      session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+    } catch (e1) {
+      // retry without dom-overlay
+      session = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test'],
+      });
+    }
+
+    await renderer.xr.setSession(session);
+    scene.background = null;
+    controls.enabled = false;
+    islandRoot.visible = false;
+    placed = false;
+    reticle.visible = false;
+    setMode('ar-scan');
+    setHint('缓慢移动手机扫描桌面，出现光圈后点击屏幕放置。');
+
+    xrRefSpace = await session.requestReferenceSpace('local');
+    xrViewerSpace = await session.requestReferenceSpace('viewer');
+    xrHitTestSource = await session.requestHitTestSource({ space: xrViewerSpace });
+
+    session.addEventListener('end', onAREnd);
+  } catch (err) {
+    console.warn(err);
+    toast('无法启动 AR');
+    setHint('启动 AR 失败：' + (err && err.message ? err.message : '请确认 HTTPS 与摄像头权限。'));
+    enterPreview();
+  }
+}
+
+function onAREnd() {
+  xrHitTestSource = null;
+  xrViewerSpace = null;
+  xrRefSpace = null;
+  reticle.visible = false;
+  btnAR.style.display = '';
+  btnPreview.style.display = '';
+  btnAR.disabled = false;
+  enterPreview();
+  checkARSupport();
+}
+
+function resetPlacement() {
+  if (!renderer.xr.isPresenting) return;
+  placed = false;
+  islandRoot.visible = false;
+  setMode('ar-scan');
+  setHint('再次扫描桌面，点击光圈位置重新放置。');
+}
+
+function onPointerDown(ev) {
+  if (!renderer.xr.isPresenting) return;
+  if (mode !== 'ar-scan') return;
+  if (!reticle.visible) {
+    toast('先对准桌面，等光圈出现');
+    return;
+  }
+  islandRoot.position.copy(reticle.position);
+  islandRoot.quaternion.copy(reticle.quaternion);
+  islandRoot.scale.setScalar(TABLE_SCALE);
+  islandRoot.visible = true;
+  placed = true;
+  reticle.visible = false;
+  setMode('ar-placed');
+  setHint('小岛已放在桌上。可走动查看，点「重新放置」换位置。');
+  toast('放置成功');
+  ev.preventDefault();
+}
+
+function animate(_t, frame) {
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (renderer.xr.isPresenting && frame && xrHitTestSource && xrRefSpace) {
+    if (!placed) {
+      const hits = frame.getHitTestResults(xrHitTestSource);
+      if (hits.length > 0) {
+        const pose = hits[0].getPose(xrRefSpace);
+        if (pose) {
+          reticle.visible = true;
+          reticle.matrix.fromArray(pose.transform.matrix);
+          reticle.matrix.decompose(reticle.position, reticle.quaternion, reticle.scale);
+          // keep reticle upright-ish on horizontal planes
+          reticle.scale.set(1, 1, 1);
+        }
+      } else {
+        reticle.visible = false;
+      }
+    }
+  }
+
+  // gentle lantern pulse
+  if (islandRoot && islandRoot.visible) {
+    const t = clock.elapsedTime;
+    islandRoot.traverse((o) => {
+      if (o.isPointLight) {
+        o.intensity = 0.45 + Math.sin(t * 2.2) * 0.12;
+      }
+    });
+  }
+
+  if (controls && controls.enabled) controls.update();
+  renderer.render(scene, camera);
+}
+
+btnAR.addEventListener('click', () => startAR());
+btnPreview.addEventListener('click', () => enterPreview());
+btnReset.addEventListener('click', () => resetPlacement());
+
+initThree();
+enterPreview();
+checkARSupport();
+</script>
+</body>
+</html>
