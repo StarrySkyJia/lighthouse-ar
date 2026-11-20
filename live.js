@@ -151,19 +151,14 @@ async function buildSceneProgressive(opts = {}) {
   btnQuality.style.display = '';
 
   if (keepCameraAR) {
-    // Stay in camera AR — do NOT paint opaque background / reset pose wrongly
     scene.background = null;
     renderer.setClearColor(0x000000, 0);
-    if (placed) {
-      worldRoot.visible = true;
-      setHint('画质已更新。场景仍在摄像头画面中。');
-    } else {
-      worldRoot.visible = false;
-      setHint('画质已更新。请再点「放置场景」。');
-    }
+    renderer.setClearAlpha(0);
     btnStart.style.display = 'none';
     btnPlace.style.display = '';
     btnExit.style.display = '';
+    placeFromCamera();
+    setHint('画质已更新。小岛仍在镜头前方。');
     return;
   }
 
@@ -237,16 +232,27 @@ async function startWebXR() {
   session.addEventListener('end', onLeaveAR);
 }
 
+function reparentWorldToScene() {
+  if (worldRoot.parent && worldRoot.parent !== scene) {
+    worldRoot.parent.remove(worldRoot);
+    scene.add(worldRoot);
+  } else if (!worldRoot.parent) {
+    scene.add(worldRoot);
+  }
+  worldRoot.position.set(0, 0, 0);
+  worldRoot.rotation.set(0, 0, 0);
+  worldRoot.scale.set(1, 1, 1);
+}
+
 function onLeaveAR() {
   xrHitTestSource = null;
   stopCameraStream();
   deviceOrientEnabled = false;
   mode = 'preview';
+  reparentWorldToScene();
   scene.background = new THREE.Color(0x0e1a26);
   renderer.setClearColor(0x000000, 1);
   worldRoot.visible = true;
-  worldRoot.position.set(0, 0, 0);
-  worldRoot.quaternion.identity();
   camera.position.set(0.55, 0.42, 0.7);
   camera.quaternion.identity();
   camera.lookAt(0, 0.08, 0);
@@ -314,44 +320,47 @@ async function startIOSCameraAR() {
 
   scene.background = null;
   renderer.setClearColor(0x000000, 0);
+  renderer.setClearAlpha(0);
   camera.position.set(0, 0, 0);
+  camera.quaternion.identity();
   camera.near = 0.05;
   camera.far = 40;
   camera.updateProjectionMatrix();
 
-  worldRoot.visible = false;
   placed = false;
   mode = 'ios-cam';
-  setHint('已打开摄像头。对准桌面，点「放置场景」——小岛会出现在镜头前方桌面上。');
   btnPlace.style.display = '';
   btnStart.style.display = 'none';
   btnExit.style.display = '';
+
+  // Attach to camera immediately — always visible in the viewfinder
+  placeFromCamera();
+  setHint('小岛已出现在镜头前方。对准桌面观看；点「放置场景」可重置位置。');
 }
 
-/** Place diorama in front of current camera view (camera-local → world). */
+/**
+ * iOS/Android without WebXR: parent diorama to the camera so it always
+ * stays in front of the lens (avoids world/sensor mismatch that hid the model).
+ */
 function placeFromCamera() {
-  updateCameraFromDevice();
-  camera.updateMatrixWorld(true);
+  // Keep island locked to the phone camera frustum
+  if (worldRoot.parent !== camera) {
+    if (worldRoot.parent) worldRoot.parent.remove(worldRoot);
+    camera.add(worldRoot);
+  }
 
-  // In front of phone, slightly downward so it sits on a desk in view
-  const local = new THREE.Vector3(0, -0.18, -0.55);
-  const pos = local.applyMatrix4(camera.matrixWorld);
-
-  worldRoot.position.copy(pos);
-
-  // Keep model upright: yaw toward camera
-  const camPos = camera.position.clone();
-  const flatCam = new THREE.Vector3(camPos.x, pos.y, camPos.z);
-  worldRoot.lookAt(flatCam);
-  worldRoot.rotateY(Math.PI);
-
-  // Extra visibility nudge: ensure scale not zero
-  if (worldRoot.scale.x === 0) worldRoot.scale.setScalar(1);
-
+  // Center-ish, slightly down, ~45cm in front — large enough to see on a desk
+  worldRoot.position.set(0, -0.1, -0.48);
+  worldRoot.rotation.set(0.2, Math.PI, 0);
+  worldRoot.scale.set(1.15, 1.15, 1.15);
   worldRoot.visible = true;
+
+  // Ensure meshes are actually in the graph
+  if (live && live.root && !live.root.parent) worldRoot.add(live.root);
+
   placed = true;
   mode = 'ar-placed';
-  setHint('已放置。转动手机可环看；点「放置场景」可换位置，「退出 AR」回预览。');
+  setHint('已放置（固定在镜头前）。转动/移动手机可对照桌面观看；「退出 AR」回预览。');
 }
 
 function onPointerDown(ev) {
