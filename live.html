@@ -56,10 +56,11 @@
     padding: 8px 10px; border-radius: 999px; background: rgba(0,0,0,.35);
   }
 </style>
+<!-- Local three.js: avoids unpkg CDN failures on mobile networks -->
 <script type="importmap">
 {
   "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    "three": "./vendor/three.module.js"
   }
 }
 </script>
@@ -76,9 +77,9 @@
   </div>
   <div class="bottom">
     <div id="loadBar"><div id="loadFill"></div></div>
-    <div id="hint">准备中…</div>
+    <div id="hint">正在加载脚本…</div>
     <div class="actions">
-      <button class="pill primary" id="btnStart" type="button">加载动态场景</button>
+      <button class="pill primary" id="btnStart" type="button" disabled>加载动态场景</button>
       <button class="pill primary" id="btnPlace" type="button" style="display:none">放置场景</button>
       <button class="pill" id="btnExit" type="button" style="display:none">退出 AR</button>
       <button class="pill" id="btnPixel" type="button" style="display:none" aria-pressed="true">像素风: 开</button>
@@ -86,6 +87,19 @@
     </div>
   </div>
 </div>
+<script>
+  window.__LIVE_OK = false;
+  window.addEventListener('unhandledrejection', function (e) {
+    var h = document.getElementById('hint');
+    if (h) h.textContent = '加载失败: ' + ((e.reason && e.reason.message) || e.reason || 'unknown');
+  });
+  setTimeout(function () {
+    if (!window.__LIVE_OK) {
+      var h = document.getElementById('hint');
+      if (h) h.textContent = '脚本未能启动。请强制刷新（Safari：长按刷新）或换 Chrome 重试。';
+    }
+  }, 5000);
+</script>
 <script type="module" src="./live.js"></script>
 </body>
 </html>
