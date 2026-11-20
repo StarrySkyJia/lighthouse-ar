@@ -1,37 +1,22 @@
-# 灯塔小岛 · 扫码桌面 AR（iOS + Android）
+# 灯塔小岛 · AR
 
-HTTPS 线上地址：
+线上：https://starryskyjia.github.io/lighthouse-ar/
 
-**https://starryskyjia.github.io/lighthouse-ar/**
-
-朋友用手机扫页内二维码（或直接打开链接）→ 点「放到桌上（AR）」→ 把小岛放到真实桌面。
-
-## 兼容方式
-
-| 设备 | 技术 |
+| 页面 | 说明 |
 |------|------|
-| iPhone / iPad | Google `model-viewer` → 系统 **AR Quick Look**（自动从 GLB 生成 USDZ） |
-| Android | **Scene Viewer** / **WebXR** |
-| 电脑 | 仅 3D 预览 |
+| `index.html` | 入口（动态 / 静态分流 + 二维码） |
+| `live.html` | **完整动态 AR**：海浪、鸟、鱼、草、渔夫、像素风 |
+| `static.html` | 快速静态 AR（Quick Look / Scene Viewer） |
 
-主海景页 `../index.html` / `src.html` **不会被本目录改动**。
+## 动态版要点
+
+- Android Chrome：WebXR hit-test 贴桌  
+- iPhone：Safari 摄像头 + 点击放置（非系统 Quick Look）  
+- 画质档 `low / med / high` 可切换，降低草/鱼数量与像素倍率  
+- 主海景 `../src.html` 不改动  
 
 ## 本地
 
 ```bash
-# 重新导出模型（可选）
-node generate-island.mjs
-
-# 静态预览
 npx --yes serve . -l 5173
 ```
-
-## 重新部署
-
-```bash
-git add -A
-git commit -m "Update AR page"
-git push
-```
-
-GitHub Pages 已指向 `main` 根目录，推送后约一分钟生效。
