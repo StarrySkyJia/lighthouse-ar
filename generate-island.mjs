@@ -1,14 +1,14 @@
 /**
- * Build a tabletop-scale lighthouse island as island.glb (meters).
+ * Build tabletop lighthouse island → island.glb + island.usdz
  * Run: node generate-island.mjs
  */
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
 import { writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Node has no FileReader; GLTFExporter needs a small polyfill.
 if (typeof globalThis.FileReader === 'undefined') {
   globalThis.FileReader = class FileReader {
     constructor() {
@@ -36,12 +36,11 @@ function buildIsland() {
   const root = new THREE.Group();
   root.name = 'LighthouseIsland';
 
+  // Opaque materials only — USDZ / Quick Look are picky about transparency.
   const landMat = new THREE.MeshStandardMaterial({ color: 0x6b9a5a, roughness: 0.85, metalness: 0.05 });
   const sandMat = new THREE.MeshStandardMaterial({ color: 0xc9a66b, roughness: 0.9, metalness: 0 });
   const rockMat = new THREE.MeshStandardMaterial({ color: 0x7a756c, roughness: 0.95, metalness: 0.05 });
-  const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x2a6f8f, roughness: 0.35, metalness: 0.15, transparent: true, opacity: 0.9,
-  });
+  const waterMat = new THREE.MeshStandardMaterial({ color: 0x2a6f8f, roughness: 0.35, metalness: 0.15 });
 
   const water = new THREE.Mesh(new THREE.CircleGeometry(0.72, 48), waterMat);
   water.rotation.x = -Math.PI / 2;
@@ -95,7 +94,7 @@ function buildIsland() {
     new THREE.MeshStandardMaterial({
       color: 0xffe3a1,
       emissive: 0xffc066,
-      emissiveIntensity: 0.7,
+      emissiveIntensity: 0.55,
       roughness: 0.4,
     })
   );
@@ -167,26 +166,41 @@ function buildIsland() {
     root.add(r);
   }
 
-  // ~22cm wide on table
   root.scale.setScalar(0.22);
   root.updateMatrixWorld(true);
   return root;
 }
 
-const scene = buildIsland();
-const exporter = new GLTFExporter();
+function exportGLB(scene) {
+  return new Promise((resolve, reject) => {
+    new GLTFExporter().parse(
+      scene,
+      (result) => resolve(Buffer.from(result)),
+      reject,
+      { binary: true, onlyVisible: true }
+    );
+  });
+}
 
-exporter.parse(
-  scene,
-  (result) => {
-    const buf = Buffer.from(result);
-    const out = join(__dirname, 'island.glb');
-    writeFileSync(out, buf);
-    console.log(`Wrote ${out} (${buf.length} bytes)`);
-  },
-  (err) => {
-    console.error(err);
-    process.exit(1);
-  },
-  { binary: true, onlyVisible: true }
-);
+async function main() {
+  const scene = buildIsland();
+
+  const glb = await exportGLB(scene);
+  writeFileSync(join(__dirname, 'island.glb'), glb);
+  console.log(`Wrote island.glb (${glb.length} bytes)`);
+
+  const usdz = await new USDZExporter().parse(scene, {
+    quickLookCompatible: true,
+    ar: {
+      anchoring: { type: 'plane' },
+      planeAnchoring: { alignment: 'horizontal' },
+    },
+  });
+  writeFileSync(join(__dirname, 'island.usdz'), Buffer.from(usdz));
+  console.log(`Wrote island.usdz (${usdz.byteLength} bytes)`);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
