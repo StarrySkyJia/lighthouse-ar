@@ -452,7 +452,7 @@ export function createLiveScene(THREE_NS, opts = {}) {
   box.getSize(size);
   root.position.y -= box.min.y;
   const span = Math.max(size.x, size.z);
-  root.scale.setScalar(0.28 / span);
+  root.scale.setScalar(0.34 / span);
   root.updateMatrixWorld(true);
 
   const api = {
