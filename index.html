@@ -3,185 +3,52 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="description" content="灯塔小岛桌面 AR：iPhone Quick Look + Android Scene Viewer" />
-<title>灯塔小岛 · 扫码桌面 AR</title>
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+<meta name="description" content="灯塔小岛 AR：完整动态版 / 快速静态版" />
+<title>灯塔小岛 · AR 入口</title>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <style>
   :root {
-    --bg0: #071018;
-    --bg1: #123047;
-    --foam: #f3f7fb;
-    --muted: rgba(243, 247, 251, 0.72);
-    --sand: #d2b07a;
-    --line: rgba(255,255,255,0.12);
+    --bg0: #071018; --bg1: #123047; --foam: #f3f7fb;
+    --muted: rgba(243,247,251,.72); --sand: #d2b07a; --line: rgba(255,255,255,.12);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     min-height: 100%;
-    background:
-      radial-gradient(1200px 700px at 50% -10%, #1b4d68 0%, transparent 55%),
+    background: radial-gradient(1000px 600px at 50% -10%, #1b4d68 0%, transparent 55%),
       linear-gradient(180deg, var(--bg1), var(--bg0));
     color: var(--foam);
-    font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    -webkit-tap-highlight-color: transparent;
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   }
-  .wrap {
-    width: min(720px, 100%);
-    margin: 0 auto;
-    padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+  .wrap { width: min(640px, 100%); margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px 32px; }
+  header { text-align: center; margin-bottom: 18px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--sand); margin-bottom: 8px; }
+  h1 { font-size: clamp(26px, 7vw, 34px); font-weight: 750; }
+  header p { margin-top: 8px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .cards { display: grid; gap: 12px; }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    padding: 16px; border-radius: 16px; border: 1px solid var(--line);
+    background: rgba(8,18,28,.55);
   }
-  header { text-align: center; margin-bottom: 14px; }
-  header .eyebrow {
-    display: inline-block;
-    font-size: 12px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--sand);
-    margin-bottom: 8px;
+  a.card.primary {
+    background: linear-gradient(145deg, rgba(240,217,160,.18), rgba(8,18,28,.65));
+    border-color: rgba(210,176,122,.45);
   }
-  header h1 {
-    font-size: clamp(26px, 7vw, 36px);
-    font-weight: 750;
-    letter-spacing: 0.02em;
-    line-height: 1.15;
+  a.card h2 { font-size: 17px; margin-bottom: 6px; }
+  a.card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .tag {
+    display: inline-block; margin-top: 10px; font-size: 11px; font-weight: 700;
+    padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,.08);
   }
-  header p {
-    margin-top: 8px;
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  #banner {
-    display: none;
-    margin-bottom: 12px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: rgba(255, 180, 70, 0.16);
-    border: 1px solid rgba(255, 210, 120, 0.45);
-    color: #ffe6b0;
-    font-size: 13px;
-    line-height: 1.5;
-  }
-  #banner strong { color: #fff; }
-  .stage {
-    position: relative;
-    border-radius: 18px;
-    overflow: hidden;
-    background: rgba(0,0,0,0.28);
-    border: 1px solid var(--line);
-    box-shadow: 0 18px 50px rgba(0,0,0,0.35);
-    aspect-ratio: 1 / 1.05;
-  }
-  model-viewer {
-    width: 100%;
-    height: 100%;
-    --poster-color: transparent;
-    background: transparent;
-  }
-  /* Hide model-viewer's own AR slots; we drive AR ourselves */
-  model-viewer .ar-btn,
-  model-viewer [slot="ar-button"],
-  model-viewer [slot="ar-failure"] { display: none !important; }
-
-  .ar-cta {
-    position: absolute;
-    left: 50%;
-    bottom: 14px;
-    transform: translateX(-50%);
-    z-index: 5;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    min-width: 180px;
-    border: 0;
-    border-radius: 999px;
-    padding: 12px 22px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #08131c;
-    background: linear-gradient(135deg, #f0d9a0, #d7ae62);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-    text-decoration: none;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .ar-cta img {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
-  }
-  .ar-cta.ghost {
-    background: rgba(255,255,255,0.16);
-    color: var(--foam);
-  }
+  .tag.hot { color: #9be7b5; }
   .panel {
-    margin-top: 16px;
-    padding: 14px 16px;
-    border-radius: 14px;
-    background: rgba(8, 18, 28, 0.55);
-    border: 1px solid var(--line);
+    margin-top: 14px; padding: 14px; border-radius: 14px;
+    background: rgba(8,18,28,.55); border: 1px solid var(--line); text-align: center;
   }
-  .panel h2 { font-size: 15px; margin-bottom: 8px; }
-  .panel ol, .panel ul {
-    padding-left: 1.2em;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.65;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: 1.2fr 0.8fr;
-    gap: 12px;
-    margin-top: 12px;
-  }
-  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
-  .share {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    text-align: center;
-  }
-  #qr {
-    width: 148px;
-    height: 148px;
-    padding: 8px;
-    border-radius: 12px;
-    background: #fff;
-  }
+  #qr { width: 148px; height: 148px; margin: 8px auto; padding: 8px; border-radius: 12px; background: #fff; }
   #qr canvas { width: 100% !important; height: 100% !important; }
-  .share .url {
-    font-size: 11px;
-    color: var(--muted);
-    word-break: break-all;
-  }
-  .chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-  }
-  .chip {
-    font-size: 12px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.08);
-    border: 1px solid var(--line);
-  }
-  .chip.ok { color: #9be7b5; }
-  .chip.warn { color: #ffd27a; }
-  footer {
-    margin-top: 18px;
-    text-align: center;
-    font-size: 12px;
-    color: rgba(243,247,251,0.45);
-  }
-  footer a { color: #9fd0e8; }
+  .url { font-size: 11px; color: var(--muted); word-break: break-all; }
+  ul { margin-top: 12px; padding-left: 1.15em; color: var(--muted); font-size: 13px; line-height: 1.65; text-align: left; }
 </style>
 </head>
 <body>
@@ -189,168 +56,42 @@
     <header>
       <div class="eyebrow">Tabletop WebAR</div>
       <h1>灯塔小岛</h1>
-      <p>扫码打开 → 点「放到桌上」→ 把<strong>原来的灯塔小岛</strong>放到真实桌面。<br/>iPhone 走系统 Quick Look，Android 走 Scene Viewer。</p>
+      <p>选一种方式放到真实桌面。完整动态版含海浪、飞鸟、鱼、草、人物与像素风。</p>
     </header>
 
-    <div id="banner"></div>
-
-    <div class="stage">
-      <model-viewer
-        id="mv"
-        src="island.glb"
-        ios-src="island.usdz"
-        alt="灯塔小岛"
-        ar
-        ar-modes="quick-look scene-viewer webxr"
-        ar-scale="fixed"
-        camera-controls
-        touch-action="pan-y"
-        shadow-intensity="1"
-        exposure="1.05"
-        environment-image="neutral"
-        auto-rotate
-        auto-rotate-delay="0"
-        rotation-per-second="12deg"
-        loading="eager"
-      ></model-viewer>
-
-      <!-- iOS: Apple official Quick Look entry (requires <img> child) -->
-      <a
-        id="iosAr"
-        class="ar-cta"
-        rel="ar"
-        href="island.usdz"
-        download="island.usdz"
-      >
-        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAD0lEQVQYV2NkYGD4z0ABRwEACvMAxVn7I3QAAAAASUVORK5CYII=" width="16" height="16" alt="灯塔小岛" />
-        放到桌上（AR）
+    <div class="cards">
+      <a class="card primary" href="./live.html">
+        <h2>完整动态 AR（推荐）</h2>
+        <p>实时海浪 / 鸟 / 鱼 / 草 / 渔夫，可开像素风。Android 用 WebXR 贴桌；iPhone 请用 Safari 摄像头放置。</p>
+        <span class="tag hot">LIVE · 动态</span>
       </a>
-
-      <!-- Android / other: activate model-viewer AR -->
-      <button id="androidAr" class="ar-cta" type="button">放到桌上（AR）</button>
-
-      <!-- Desktop fallback -->
-      <button id="deskHint" class="ar-cta ghost" type="button">请用手机扫码体验 AR</button>
+      <a class="card" href="./static.html">
+        <h2>快速静态 AR</h2>
+        <p>系统 Quick Look / Scene Viewer，加载更快，适合先试放置；无实时动画与像素风。</p>
+        <span class="tag">QUICK · 静态</span>
+      </a>
     </div>
 
-    <div class="chip-row" id="chips"></div>
-
-    <div class="grid">
-      <section class="panel">
-        <h2>怎么用</h2>
-        <ol>
-          <li><strong>iPhone</strong>：请用 <strong>Safari</strong> 打开本页（微信里需点右上角 ··· → 在 Safari 中打开）。</li>
-          <li>点黄色「放到桌上（AR）」，进入系统 AR 后对准桌面放置。</li>
-          <li><strong>Android</strong>：推荐 Chrome，点同一按钮即可。</li>
-        </ol>
-      </section>
-      <section class="panel share">
-        <h2>分享给朋友</h2>
-        <div id="qr" aria-label="本页二维码"></div>
-        <div class="url" id="pageUrl"></div>
-      </section>
-    </div>
-
-    <section class="panel" style="margin-top:12px">
-      <h2>若 iPhone 仍进不了 AR</h2>
+    <section class="panel">
+      <h2 style="font-size:15px;margin-bottom:4px">扫码打开本页</h2>
+      <div id="qr"></div>
+      <div class="url" id="pageUrl"></div>
       <ul>
-        <li>不要用微信内置浏览器直接点 AR，先转到 Safari。</li>
-        <li>也可直接打开模型文件：<a id="usdzLink" href="island.usdz">island.usdz</a>（Safari 会提示用 AR Quick Look 查看）。</li>
-        <li>系统需 iOS 12+，并允许网站使用摄像头 / AR。</li>
+        <li>iPhone：用 <strong>Safari</strong>（微信内请 ··· → 在 Safari 打开）。</li>
+        <li>Android：推荐 <strong>Chrome</strong>。</li>
+        <li>动态版首次会分阶段加载；可在页内切换画质档加速。</li>
       </ul>
     </section>
-
-    <footer>
-      模型约 22cm 桌面尺度 ·
-      <a href="https://github.com/StarrySkyJia/lighthouse-ar" target="_blank" rel="noopener">源码</a>
-    </footer>
   </div>
-
 <script>
-(function () {
   const url = location.href.split('#')[0];
   document.getElementById('pageUrl').textContent = url;
-  document.getElementById('usdzLink').href = new URL('island.usdz', location.href).href;
-
-  const ua = navigator.userAgent || '';
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isAndroid = /Android/i.test(ua);
-  const isWeChat = /MicroMessenger/i.test(ua);
-  const isQQ = /\bQQ\//i.test(ua);
-  const isInApp = isWeChat || isQQ || /BytedanceWebview|Aweme|DingTalk/i.test(ua);
-
-  const chips = document.getElementById('chips');
-  const banner = document.getElementById('banner');
-  const iosAr = document.getElementById('iosAr');
-  const androidAr = document.getElementById('androidAr');
-  const deskHint = document.getElementById('deskHint');
-  const mv = document.getElementById('mv');
-
-  function addChip(text, cls) {
-    const el = document.createElement('span');
-    el.className = 'chip ' + (cls || '');
-    el.textContent = text;
-    chips.appendChild(el);
-  }
-
-  // Absolute USDZ URL helps some iOS / in-app browsers
-  iosAr.href = new URL('island.usdz', location.href).href;
-
-  if (isIOS) {
-    iosAr.style.display = 'flex';
-    addChip('iOS · 系统 Quick Look AR', 'ok');
-    if (isInApp) {
-      banner.style.display = 'block';
-      banner.innerHTML = '<strong>检测到微信/内置浏览器。</strong> iPhone 的桌面 AR 需要 Safari：请点右上角 <strong>···</strong> → <strong>在 Safari 中打开</strong>，再点「放到桌上」。';
-      addChip('请改用 Safari', 'warn');
-    }
-  } else if (isAndroid) {
-    androidAr.style.display = 'flex';
-    addChip('Android · Scene Viewer / WebXR', 'ok');
-    if (isWeChat) {
-      banner.style.display = 'block';
-      banner.innerHTML = '微信内置浏览器对 AR 支持不稳定。若按钮无效，请点右上角 <strong>···</strong> → <strong>在浏览器中打开</strong>（Chrome）。';
-      addChip('建议用 Chrome 打开', 'warn');
-    }
-  } else {
-    deskHint.style.display = 'flex';
-    addChip('桌面端仅预览', 'warn');
-  }
-
-  if (location.protocol === 'https:' || location.hostname === 'localhost') {
-    addChip('HTTPS 已就绪', 'ok');
-  } else {
-    addChip('非 HTTPS，AR 可能失败', 'warn');
-  }
-
-  androidAr.addEventListener('click', async () => {
-    try {
-      if (mv.canActivateAR) {
-        await mv.activateAR();
-      } else {
-        // Fallback: intent-style Scene Viewer
-        const modelUrl = encodeURIComponent(new URL('island.glb', location.href).href);
-        const intent = 'intent://arvr.google.com/scene-viewer/1.0?file=' + modelUrl +
-          '&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=' +
-          encodeURIComponent(location.href) + ';end;';
-        location.href = intent;
-      }
-    } catch (e) {
-      alert('无法启动 AR，请用 Chrome 打开本页后重试');
-    }
-  });
-
-  if (window.QRCode && QRCode.toCanvas) {
+  if (window.QRCode) {
     const box = document.getElementById('qr');
-    const canvas = document.createElement('canvas');
-    box.appendChild(canvas);
-    QRCode.toCanvas(canvas, url, {
-      width: 132,
-      margin: 1,
-      color: { dark: '#123047', light: '#ffffff' },
-    });
+    const c = document.createElement('canvas');
+    box.appendChild(c);
+    QRCode.toCanvas(c, url, { width: 132, margin: 1, color: { dark: '#123047', light: '#ffffff' } });
   }
-})();
 </script>
 </body>
 </html>
